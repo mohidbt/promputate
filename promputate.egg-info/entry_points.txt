@@ -1,0 +1,2 @@
+[console_scripts]
+promputate = promputate.cli:main

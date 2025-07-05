@@ -1,0 +1,120 @@
+Metadata-Version: 2.4
+Name: promputate
+Version: 0.1.0
+Summary: Genetic Algorithm for Prompt Optimization
+Home-page: https://github.com/promputate/promputate
+Author: Promputate Team
+Author-email: promputate@example.com
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Text Processing :: Linguistic
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: deap>=1.3.1
+Requires-Dist: nltk>=3.8.1
+Requires-Dist: spacy>=3.7.0
+Provides-Extra: llm
+Requires-Dist: openai>=1.35.0; extra == "llm"
+Requires-Dist: anthropic>=0.25.0; extra == "llm"
+Provides-Extra: analysis
+Requires-Dist: pandas>=2.0.0; extra == "analysis"
+Requires-Dist: statsmodels>=0.14.0; extra == "analysis"
+Provides-Extra: api
+Requires-Dist: fastapi>=0.100.0; extra == "api"
+Requires-Dist: uvicorn>=0.20.0; extra == "api"
+Provides-Extra: ui
+Requires-Dist: streamlit>=1.25.0; extra == "ui"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.20.0; extra == "dev"
+Provides-Extra: all
+Requires-Dist: openai>=1.35.0; extra == "all"
+Requires-Dist: anthropic>=0.25.0; extra == "all"
+Requires-Dist: pandas>=2.0.0; extra == "all"
+Requires-Dist: statsmodels>=0.14.0; extra == "all"
+Requires-Dist: fastapi>=0.100.0; extra == "all"
+Requires-Dist: uvicorn>=0.20.0; extra == "all"
+Requires-Dist: streamlit>=1.25.0; extra == "all"
+Requires-Dist: pytest>=7.0.0; extra == "all"
+Requires-Dist: pytest-asyncio>=0.20.0; extra == "all"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+# Promputate - Genetic Algorithm for Prompt Optimization
+
+## Proof of Concept
+
+This repository contains a minimal working proof of concept for optimizing prompts using genetic algorithms to influence LLM responses.
+
+### Goal
+Optimize prompts to get "MacBook" mentioned first when asking for laptop recommendations.
+
+### Quick Start
+
+1. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Set up OpenAI API key**:
+   ```bash
+   export OPENAI_API_KEY="your-api-key-here"
+   ```
+
+3. **Run the proof of concept**:
+   ```bash
+   python proof_of_concept.py
+   ```
+
+### What It Does
+
+The genetic algorithm:
+1. **Starts** with base prompt: "Recommend a good laptop for programming"
+2. **Mutates** using three operators:
+   - **Synonym replacement**: "recommend" → "suggest", "good" → "excellent"
+   - **Modifier addition**: "laptop" → "professional laptop", "premium laptop"
+   - **Prompt reordering**: Different question structures
+3. **Evaluates** each variant with OpenAI GPT-4o-mini
+4. **Tracks** multiple success metrics:
+   - **MacBook mention rank** (primary)
+   - **Response length** (conciseness bonus)
+   - **Competing brands** (penalty for ThinkPad, Dell, etc.)
+   - **Brand context** (positive/negative sentiment)
+5. **Evolves** over 3-5 generations to find optimal prompts
+
+### Success Metrics
+
+- **First-mention rank**: Position where MacBook appears (1 = best)
+- **Fitness score**: Combination of rank + bonuses - penalties
+- **Evolution progress**: Improvement across generations
+
+### Example Results
+
+Generation 1: "Recommend a good laptop for programming"
+- MacBook rank: 3, Fitness: 0.21
+
+Generation 3: "What's the best premium laptop for software development?"
+- MacBook rank: 1, Fitness: 0.87
+
+### Next Steps
+
+See `scope.md` for the full technical plan including:
+- **P0**: Standalone genetic algorithm library
+- **P1**: Enhanced OpenAI integration with causal analysis
+- **P2**: Multi-LLM support (Claude, Gemini, Perplexity) # promputate
