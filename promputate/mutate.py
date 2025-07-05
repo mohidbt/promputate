@@ -187,26 +187,83 @@ class PromptGA:
     
     def _mutate(self, individual: List[str]) -> Tuple[List[str]]:
         """
-        Mutation operator for prompts
+        Mutation operator for prompts with quality validation
         
-        Applies random mutation operators to the prompt
+        Tries multiple operators and validates results to prevent broken text
         """
         if not self.mutation_operators or len(individual) == 0:
             return individual,
         
-        # Select random mutation operator
-        operator = random.choice(self.mutation_operators)
+        original_text = individual[0]
         
-        try:
-            # Apply mutation
-            mutated_prompt = operator(individual[0])
-            individual[0] = mutated_prompt
-        except Exception as e:
-            logger.warning(f"Mutation failed: {e}")
-            # Keep original if mutation fails
-            pass
+        # Try up to 3 different operators to find a good mutation
+        operators_to_try = self.mutation_operators.copy()
+        random.shuffle(operators_to_try)
         
+        for operator in operators_to_try[:3]:  # Try max 3 operators
+            try:
+                # Apply mutation
+                mutated_prompt = operator(original_text)
+                
+                # Validate the result
+                if self._is_valid_mutation(original_text, mutated_prompt):
+                    individual[0] = mutated_prompt
+                    logger.debug(f"Applied mutation: {operator.__name__}")
+                    return individual,
+                else:
+                    logger.debug(f"Mutation {operator.__name__} failed validation")
+                    
+            except Exception as e:
+                logger.warning(f"Mutation {operator.__name__} failed: {e}")
+                continue
+        
+        # If all mutations failed validation, keep original
+        logger.debug("All mutations failed validation, keeping original")
         return individual,
+    
+    def _is_valid_mutation(self, original: str, mutated: str) -> bool:
+        """
+        Validate that a mutation produces reasonable text
+        
+        Args:
+            original: Original text
+            mutated: Mutated text
+            
+        Returns:
+            True if mutation is valid, False otherwise
+        """
+        if not mutated or not mutated.strip():
+            return False
+        
+        words = mutated.split()
+        
+        # Check basic word count constraints
+        if len(words) < 3 or len(words) > 30:
+            return False
+        
+        # Check for duplicate consecutive words
+        for i in range(len(words) - 1):
+            if words[i].lower() == words[i + 1].lower():
+                return False
+        
+        # Check for reasonable text structure
+        if mutated.count('?') > 2 or mutated.count('.') > 3:
+            return False
+        
+        # Check for incomplete sentences (ending with articles/conjunctions)
+        if mutated.lower().endswith((' a ', ' an ', ' the ', ' and ', ' or ', ' but ')):
+            return False
+        
+        # Check for reasonable similarity to original (not completely different)
+        original_words = set(original.lower().split())
+        mutated_words = set(mutated.lower().split())
+        overlap = len(original_words & mutated_words)
+        
+        # At least 25% word overlap to maintain meaning
+        if overlap < min(3, len(original_words) * 0.25):
+            return False
+        
+        return True
     
     def _evaluate_individual(self, individual: List[str]) -> Tuple[float]:
         """Evaluate a single individual's fitness"""
@@ -240,10 +297,8 @@ class PromptGA:
             # Start with base prompt
             variant = creator.Individual([base_prompt])  # type: ignore
             
-            # Apply 1-3 random mutations
-            num_mutations = random.randint(1, 3)
-            for _ in range(num_mutations):
-                self._mutate(variant)
+            # Apply only 1 mutation to prevent cascading failures
+            self._mutate(variant)
             
             population.append(variant)
         

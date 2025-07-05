@@ -4,10 +4,15 @@
 
 ## 🎯 What It Does
 
-Promputate helps you optimize prompts to get specific outcomes from LLMs. For example:
-- **Input**: "Recommend a good laptop for programming"
-- **Goal**: Get "MacBook" mentioned first in the response
-- **Output**: "What's the best premium laptop for software development?" (MacBook rank: 1, fitness: 0.87)
+It helps you optimize prompts to get specific outcomes from LLMs. For example:
+- **User Input**: "Recommend a good laptop for programming"
+- **Goal**: Optimize for "MacBook" mentioned first in the response
+- **Process**: 
+  1. Mutate the user prompt and feed in LLMs. I.e. the user prompt becomes "What's the best premium laptop for software development?". 
+  2. The mutated prompts run multiple times
+- **Output**: 
+  1. Competitive analysis of the prompts ran (how well was your brand represented), resulting in a "fitness score"
+  2. Telling you which prompt was best for your brand.
 
 ## 🚀 Quick Start
 
@@ -77,14 +82,83 @@ python main.py
 ```
 
 The app will guide you through:
-1. Entering your base prompt
-2. Specifying target brand and competitors
-3. Choosing configuration (Quick/Balanced/Thorough)
-4. Running evolution and viewing results
+1. Entering your base prompt and target brand
+2. **LLM-powered domain analysis** (automatically detects product type and suggests competitors)
+3. Reviewing and customizing LLM suggestions
+4. Choosing configuration (Quick/Balanced/Thorough)
+5. Running evolution with domain-specific optimization
+6. Viewing comprehensive results
+
+#### Terminal App Interface Example
+
+```
+🧬 Welcome to Promputate - GA Prompt Optimization!
+
+📝 Base prompt: I need comfortable socks for running
+🎯 Target brand: Nike
+
+🤖 DOMAIN ANALYSIS METHOD
+1. LLM-powered analysis (recommended) - Auto-detect competitors & language
+2. Manual configuration - Enter competitors manually
+Choose analysis method (1-2) [default: 1]: 1
+
+🔍 Analyzing your product domain...
+✅ Analysis complete! (Confidence: 92%)
+📊 Product: athletic socks
+🏭 Industry: sportswear  
+🎯 Audience: athletes
+
+🏭 SUGGESTED COMPETITORS:
+   Adidas, Under Armour, Bombas, Smartwool
+
+🔍 Review competitors (comma-separated, or press Enter to accept):
+✅ Using suggested competitors: Adidas, Under Armour, Bombas, Smartwool
+
+📝 SUGGESTED SYNONYMS:
+   Comfort: cushioned, breathable, soft
+   Performance: moisture-wicking, arch-support
+
+🎨 SUGGESTED MODIFIERS:
+   Quality: premium, professional, high-performance
+   Design: seamless, ergonomic, lightweight
+
+⚙️ Configuration: Balanced (50 pop, 20 gen)
+🚀 Start optimization? (Y/n): y
+
+✅ Using LLM-generated synonyms and modifiers
+🧬 Running genetic algorithm evolution...
+```
 
 ## 🧬 How It Works
 
-### 1. Genetic Algorithm Process
+### 1. LLM-Powered Domain Analysis
+
+**Universal Product Optimization**: The library automatically analyzes your product domain and generates relevant competitors, synonyms, and modifiers using LLM intelligence.
+
+```
+User Input: "I need comfortable socks for running" + Target: "Nike"
+    ↓ 
+LLM Analysis: Product = Athletic Socks, Industry = Sportswear
+    ↓
+Auto-Generated Suggestions:
+├── Competitors: ["Adidas", "Under Armour", "Bombas", "Smartwool"]
+├── Synonyms: {"socks": ["hosiery", "footwear"], "comfortable": ["cushioned", "breathable"]}
+└── Modifiers: {"performance": ["moisture-wicking", "arch-support"], "comfort": ["padded", "seamless"]}
+    ↓
+User Review Interface: Edit suggestions before optimization
+    ↓
+Dynamic Injection: Replace static dictionaries with domain-specific versions
+    ↓
+Optimized Evolution: GA uses relevant language for the specific product
+```
+
+**Benefits**:
+- ✅ **Zero setup** - Works for any product immediately (socks, flour, repair services, etc.)
+- ✅ **LLM intelligence** - Leverages vast product knowledge for relevant suggestions
+- ✅ **User control** - Review and customize all suggestions before optimization
+- ✅ **Domain-specific** - Mutations use language appropriate to your product category
+
+### 2. Genetic Algorithm Process
 
 ```
 Initial Population (50 prompts)
@@ -100,7 +174,7 @@ Repeat for 20 Generations
 Return Best Prompt
 ```
 
-### 2. Mutation Operators
+### 3. Mutation Operators
 
 The library includes 5 mutation operators that modify prompts:
 
@@ -110,7 +184,7 @@ The library includes 5 mutation operators that modify prompts:
 4. **Prompt Reorder**: Convert statements to questions and vice versa
 5. **Intensity Modifier**: Adjust urgency/formality levels
 
-### 3. Fitness Evaluation
+### 4. Fitness Evaluation
 
 **Formula**: `Fitness = Base Score + Bonuses - Penalties`
 
@@ -192,6 +266,8 @@ promputate/
 ├── mutate.py            # GA engine (PromptGA)
 ├── operators.py         # Mutation operators
 ├── config.py            # Configuration classes
+├── domain_analyzer.py   # LLM-powered domain analysis
+├── dynamic_injection.py # Dynamic dictionary injection
 ├── scorers/
 │   ├── base_scorer.py   # Abstract scorer interface
 │   ├── openai_scorer.py # OpenAI API integration
@@ -256,11 +332,13 @@ export OPENAI_API_KEY="your-api-key"
 
 ## 🎯 Use Cases
 
-- **Brand Optimization**: Influence LLM responses to mention specific brands first
-- **Content Marketing**: Optimize prompts for desired product mentions
-- **A/B Testing**: Systematically test prompt variations
-- **Response Quality**: Optimize for specific response characteristics
-- **Competitive Analysis**: Track competitor mention patterns
+- **Universal Brand Optimization**: Influence LLM responses for any product/service (socks, flour, repair services, etc.)
+- **Zero-Setup Marketing**: LLM automatically detects your product domain and suggests relevant competitors
+- **Content Marketing**: Optimize prompts with domain-specific language and synonyms
+- **A/B Testing**: Systematically test prompt variations across different product categories
+- **Response Quality**: Optimize for specific response characteristics with intelligent defaults
+- **Competitive Analysis**: Track competitor mention patterns with auto-generated competitor lists
+- **Cross-Domain Marketing**: Use the same system for vastly different products without manual configuration
 
 ## 📋 Requirements
 

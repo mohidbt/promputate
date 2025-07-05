@@ -29,13 +29,80 @@ try:
         PromptIndividual, EvolutionResult
     )
     from promputate.scorers import create_openai_evaluator
+    from promputate.domain_analyzer import analyze_product_domain, DomainAnalysis
+    from promputate.dynamic_injection import dynamic_dictionaries
 except ImportError as e:
     logger.error(f"Failed to import Promputate: {e}")
     logger.error("Make sure you've installed the package: pip install -e .")
     sys.exit(1)
 
 
-def get_user_input():
+async def analyze_domain_with_user_review(base_prompt: str, target_brand: str, api_key: str) -> dict:
+    """Analyze domain with LLM and get user review of suggestions"""
+    print("\n🤖 LLM-POWERED DOMAIN ANALYSIS")
+    print("-" * 30)
+    print("🔍 Analyzing your product domain...")
+    
+    try:
+        # Run domain analysis
+        domain_analysis = await analyze_product_domain(base_prompt, target_brand, api_key)
+        
+        print(f"✅ Analysis complete! (Confidence: {domain_analysis.confidence:.1%})")
+        print(f"📊 Product: {domain_analysis.product_category}")
+        print(f"🏭 Industry: {domain_analysis.industry}")
+        print(f"🎯 Audience: {domain_analysis.target_audience}")
+        
+        # Display competitor suggestions
+        print(f"\n🏭 SUGGESTED COMPETITORS:")
+        print(f"   {', '.join(domain_analysis.competitors)}")
+        
+        # Get user review of competitors
+        print("\n🔍 Review competitors (comma-separated, or press Enter to accept):")
+        competitor_input = input("Competitors: ").strip()
+        
+        if competitor_input:
+            competitor_brands = [brand.strip() for brand in competitor_input.split(",")]
+            print(f"✅ Using custom competitors: {', '.join(competitor_brands)}")
+        else:
+            competitor_brands = domain_analysis.competitors
+            print(f"✅ Using suggested competitors: {', '.join(competitor_brands)}")
+        
+        # Display synonym suggestions
+        print(f"\n📝 SUGGESTED SYNONYMS:")
+        for category, synonyms in domain_analysis.synonyms.items():
+            if synonyms:
+                print(f"   {category.title()}: {', '.join(synonyms[:5])}")
+        
+        # Display modifier suggestions
+        print(f"\n🎨 SUGGESTED MODIFIERS:")
+        for category, modifiers in domain_analysis.modifiers.items():
+            if modifiers:
+                print(f"   {category.title()}: {', '.join(modifiers[:5])}")
+        
+        # Ask if user wants to customize
+        customize = input("\n🔧 Customize synonyms/modifiers? (y/N): ").strip().lower()
+        
+        if customize == 'y':
+            print("📝 For now, using suggested synonyms/modifiers as-is")
+            print("   (Custom editing will be added in future versions)")
+        
+        return {
+            'domain_analysis': domain_analysis,
+            'competitor_brands': competitor_brands,
+            'using_llm_analysis': True
+        }
+        
+    except Exception as e:
+        print(f"❌ LLM analysis failed: {e}")
+        print("💡 Falling back to manual configuration...")
+        return {
+            'domain_analysis': None,
+            'competitor_brands': None,
+            'using_llm_analysis': False
+        }
+
+
+async def get_user_input():
     """Get user input for configuration"""
     print("🧬 Welcome to Promputate - GA Prompt Optimization!")
     print("=" * 60)
@@ -65,17 +132,47 @@ def get_user_input():
         target_brand = "MacBook"
         print(f"Using default: {target_brand}")
     
-    # Get competitor brands
-    print("\n🏭 COMPETITOR BRANDS")
+    # Ask about LLM-powered domain analysis
+    print("\n🤖 DOMAIN ANALYSIS METHOD")
     print("-" * 30)
-    print("Enter competitor brands separated by commas (or press Enter for defaults):")
-    competitor_input = input("Competitors: ").strip()
+    print("1. LLM-powered analysis (recommended) - Auto-detect competitors & language")
+    print("2. Manual configuration - Enter competitors manually")
     
-    if competitor_input:
-        competitor_brands = [brand.strip() for brand in competitor_input.split(",")]
+    analysis_choice = input("Choose analysis method (1-2) [default: 1]: ").strip()
+    
+    domain_analysis = None
+    competitor_brands = None
+    
+    if analysis_choice == "2":
+        # Manual configuration
+        print("\n🏭 COMPETITOR BRANDS")
+        print("-" * 30)
+        print("Enter competitor brands separated by commas (or press Enter for defaults):")
+        competitor_input = input("Competitors: ").strip()
+        
+        if competitor_input:
+            competitor_brands = [brand.strip() for brand in competitor_input.split(",")]
+        else:
+            competitor_brands = ["ThinkPad", "Dell XPS", "HP Spectre", "Surface Laptop", "Alienware"]
+            print(f"Using defaults: {', '.join(competitor_brands)}")
     else:
-        competitor_brands = ["ThinkPad", "Dell XPS", "HP Spectre", "Surface Laptop", "Alienware"]
-        print(f"Using defaults: {', '.join(competitor_brands)}")
+        # LLM-powered analysis
+        analysis_result = await analyze_domain_with_user_review(base_prompt, target_brand, api_key)
+        domain_analysis = analysis_result['domain_analysis']
+        competitor_brands = analysis_result['competitor_brands']
+        
+        # If LLM analysis failed, fall back to manual
+        if not analysis_result['using_llm_analysis']:
+            print("\n🏭 COMPETITOR BRANDS")
+            print("-" * 30)
+            print("Enter competitor brands separated by commas (or press Enter for defaults):")
+            competitor_input = input("Competitors: ").strip()
+            
+            if competitor_input:
+                competitor_brands = [brand.strip() for brand in competitor_input.split(",")]
+            else:
+                competitor_brands = ["ThinkPad", "Dell XPS", "HP Spectre", "Surface Laptop", "Alienware"]
+                print(f"Using defaults: {', '.join(competitor_brands)}")
     
     # Get configuration level
     print("\n⚙️ CONFIGURATION LEVEL")
@@ -103,6 +200,7 @@ def get_user_input():
         'base_prompt': base_prompt,
         'target_brand': target_brand,
         'competitor_brands': competitor_brands,
+        'domain_analysis': domain_analysis,
         'config': config,
         'config_name': config_name
     }
@@ -116,6 +214,19 @@ def print_summary(user_config: dict):
     print(f"📝 Base Prompt: '{user_config['base_prompt']}'")
     print(f"🎯 Target Brand: {user_config['target_brand']}")
     print(f"🏭 Competitors: {', '.join(user_config['competitor_brands'])}")
+    
+    # Show domain analysis info if available
+    domain_analysis = user_config.get('domain_analysis')
+    if domain_analysis:
+        print(f"🤖 Domain Analysis: {domain_analysis.product_category}")
+        print(f"   • Industry: {domain_analysis.industry}")
+        print(f"   • Audience: {domain_analysis.target_audience}")
+        print(f"   • Confidence: {domain_analysis.confidence:.1%}")
+        print(f"   • Synonyms: {sum(len(syns) for syns in domain_analysis.synonyms.values())} terms")
+        print(f"   • Modifiers: {sum(len(mods) for mods in domain_analysis.modifiers.values())} terms")
+    else:
+        print("🤖 Domain Analysis: Manual configuration")
+    
     print(f"⚙️ Configuration: {user_config['config_name']}")
     print(f"   • Population Size: {user_config['config'].ga.population_size}")
     print(f"   • Max Generations: {user_config['config'].ga.max_generations}")
@@ -171,13 +282,25 @@ async def run_optimization(user_config: dict):
                 print("🛑 Optimization cancelled")
                 return None
     
-    # Run evolution
+    # Run evolution with dynamic injection if available
     print("\n🧬 Running genetic algorithm evolution...")
-    result = await ga.evolve(
-        base_prompt=user_config['base_prompt'],
-        fitness_evaluator=evaluator,
-        mutation_operators=operators
-    )
+    
+    domain_analysis = user_config.get('domain_analysis')
+    if domain_analysis:
+        print("✅ Using LLM-generated synonyms and modifiers")
+        with dynamic_dictionaries(domain_analysis):
+            result = await ga.evolve(
+                base_prompt=user_config['base_prompt'],
+                fitness_evaluator=evaluator,
+                mutation_operators=operators
+            )
+    else:
+        print("📝 Using static dictionaries")
+        result = await ga.evolve(
+            base_prompt=user_config['base_prompt'],
+            fitness_evaluator=evaluator,
+            mutation_operators=operators
+        )
     
     return result
 
@@ -215,7 +338,7 @@ async def main():
     """Main application function"""
     try:
         # Get user input
-        user_config = get_user_input()
+        user_config = await get_user_input()
         
         # Print summary
         print_summary(user_config)
