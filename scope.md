@@ -1,4 +1,4 @@
-# PromptForce A/B Causal Lab – **Scope & Technical Plan**
+# Promputate A/B Causal Lab – **Scope & Technical Plan**
 
 ## 1 Purpose
 Provide a **local Python backend** that discovers prompt phrasing which maximises first‑mention rank for a target brand in LLM answers (ChatGPT, Claude 3, etc.).
@@ -10,14 +10,14 @@ The backend is packaged as a reusable library so it can later power a full‑sta
 | Level | Goal | Outcome |
 |-------|------|---------|
 | **P-1** | **Proof of Concept** – minimal working genetic algorithm with OpenAI | Single-file demo showing evolution of "MacBook first-mention" optimization |
-| **P0** | **Prompt Mutation Engine** – genetic algorithm module, no LLM calls | Stand‑alone library `promptforce.mutate` published on PyPI |
+| **P0** | **Prompt Mutation Engine** – genetic algorithm module | Stand‑alone library `promputate.mutate` published on PyPI |
 | **P1** | **OpenAI Scoring + Optimisation Loop** | Rank‑aware evaluator using GPT‑4o; produces uplift metrics & causal stats |
 | **P2** | **Multi‑LLM Expansion** (Anthropic Claude, Gemini, Perplexity) | Pluggable scorer adapters + unified config |
 
 ---
 
 ## 3 High‑Level Deliverables
-- Python package **`promptforce/`** (pip‑installable).
+- Python package **`promputate/`** (pip‑installable).
 - CLI **`pf-run`** to launch GA experiments.
 - Streamlit UI **`app.py`** for real‑time monitoring.
 - Dockerfile + Makefile for local runs / CI.
@@ -26,13 +26,13 @@ The backend is packaged as a reusable library so it can later power a full‑sta
 
 ## 4 Task Checklist
 
-### P-1 – Proof of Concept  (❯ 2 h)
+### P-1 – Proof of Concept  (❯ 2 h) ✅ **COMPLETE**
 - [x] **Create minimal GA implementation** with synonym replacement, modifier addition, and prompt reordering
 - [x] **OpenAI API integration** using GPT-4o-mini for cost efficiency
 - [x] **Multi-metric evaluation** tracking first-mention rank, response length, competing brands, and brand sentiment
-- [ ] **Test with laptop example** using "Recommend a good laptop for programming" → MacBook optimization
-- [ ] **Validate evolution** across 3-5 generations with population size 15-20
-- [ ] **Document results** showing fitness improvement and best prompt variants
+- [x] **Test with laptop example** using "Recommend a good laptop for programming" → MacBook optimization
+- [x] **Validate evolution** across 3-5 generations with population size 15-20
+- [x] **Document results** showing fitness improvement and best prompt variants
 
 ### P0 – Prompt Mutation Engine  (❯ 4 h)
 - [ ] **Design token schema** (list of strings + positional metadata)
@@ -41,7 +41,7 @@ The backend is packaged as a reusable library so it can later power a full‑sta
 - [ ] Implement **modifier_toggle()** using curated adjective list
 - [ ] Wire operators into **DEAP GA** (`population_size`, `generations` configurable)
 - [ ] Write **unit tests** (`pytest`) covering each operator
-- [ ] Package & publish **`promptforce-mutate`** on TestPyPI
+- [ ] Package & publish **`promputate-mutate`** on TestPyPI
 
 ### P1 – OpenAI Integration & Optimisation  (❯ 6 h)
 - [ ] Add **OpenAI scorer adapter** (`openai>=1.14.0`)
@@ -55,7 +55,7 @@ The backend is packaged as a reusable library so it can later power a full‑sta
 ### P2 – Multi‑LLM Expansion  (❯ 4 h)
 - [ ] Add **Anthropic Claude** adapter (`anthropic` SDK)
 - [ ] Add **Perplexity Sonar** adapter (free endpoint)
-- [ ] Adapter registry pattern (`promptforce.scorers`)
+- [ ] Adapter registry pattern (`promputate.scorers`)
 - [ ] Config‑driven model selection (`config.yaml`)
 - [ ] Update documentation & tests for multi‑LLM
 
@@ -91,7 +91,7 @@ Where:
 
 ## 5 Folder Skeleton
 ```
-promptforce/
+promputate/
 ├── __init__.py
 ├── mutate.py         # P0 GA operators
 ├── scorer_openai.py  # P1 adapter
