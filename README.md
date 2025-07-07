@@ -14,6 +14,7 @@ It helps you optimize prompts to get specific outcomes from LLMs. For example:
   1. Competitive analysis of the prompts ran (how well was your brand represented), resulting in a "fitness score"
   2. Telling you which prompt was best for your brand.
 
+
 ## 🚀 Quick Start
 
 ### Installation

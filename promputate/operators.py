@@ -58,6 +58,11 @@ SYNONYM_DICTIONARY = {
     'help': ['assist', 'aid', 'support', 'guide', 'advise'],
     'find': ['locate', 'discover', 'identify', 'seek', 'search for'],
     'looking': ['searching', 'seeking', 'hunting', 'browsing', 'shopping'],
+    'underwear': ['underclothing', 'undergarment', 'underclothes'],
+    'clothing': ['garment', 'apparel', 'wear', 'attire'],
+    'socks': ['hosiery'],
+    'shoes': ['footwear', 'sneakers', 'boots'],
+    'sports': ['athletics', 'exercise', 'fitness', 'workout'],
 }
 
 MODIFIERS = {
@@ -165,7 +170,15 @@ def synonym_replace(prompt: str, max_replacements: int = 2) -> str:
         if word in SYNONYM_DICTIONARY:
             synonyms.update(SYNONYM_DICTIONARY[word])
         
-        # Try WordNet if available
+        # Skip WordNet for very common words that get weird synonyms
+        skip_wordnet = {
+            'i', 'me', 'my', 'a', 'an', 'the', 'is', 'are', 'was', 'were', 
+            'have', 'has', 'had', 'do', 'does', 'did', 'can', 'could', 'would', 'should'
+        }
+        if word in skip_wordnet:
+            continue
+        
+        # Try WordNet if available (but be more conservative)
         if NLTK_AVAILABLE and len(synonyms) < 3:
             try:
                 for syn in wordnet.synsets(word):
@@ -173,11 +186,17 @@ def synonym_replace(prompt: str, max_replacements: int = 2) -> str:
                         for lemma in syn.lemmas():
                             if lemma and hasattr(lemma, 'name'):
                                 synonym = lemma.name().replace('_', ' ')
-                                if synonym.lower() != word.lower() and len(synonym.split()) <= 2:
+                                # More conservative filtering
+                                if (synonym.lower() != word.lower() and 
+                                    len(synonym.split()) <= 2 and
+                                    len(synonym) <= 15 and  # Avoid overly long technical terms
+                                    not any(char.isdigit() for char in synonym) and  # No numbers
+                                    not synonym.lower().endswith(('ic', 'al', 'ous', 'ine', 'ism', 'tic')) and  # Avoid technical suffixes
+                                    synonym.isalpha() or ' ' in synonym):  # Only alphabetic or simple phrases
                                     synonyms.add(synonym)
-                                if len(synonyms) >= 5:  # Limit synonyms
+                                if len(synonyms) >= 3:  # Reduced limit
                                     break
-                    if len(synonyms) >= 5:
+                    if len(synonyms) >= 3:
                         break
             except Exception as e:
                 logger.debug(f"WordNet lookup failed for '{word}': {e}")
@@ -185,6 +204,11 @@ def synonym_replace(prompt: str, max_replacements: int = 2) -> str:
         # Apply synonym if found
         if synonyms:
             synonym = random.choice(list(synonyms))
+            
+            # Validate synonym is not empty or just whitespace
+            if not synonym or not synonym.strip():
+                logger.debug(f"Skipping empty synonym for '{words[idx]}'")
+                continue
             
             # Preserve capitalization
             if words[idx][0].isupper():
@@ -195,9 +219,13 @@ def synonym_replace(prompt: str, max_replacements: int = 2) -> str:
             if punctuation:
                 synonym += ''.join(punctuation)
             
-            result_words[idx] = synonym
-            replacements_made += 1
-            logger.debug(f"Replaced '{words[idx]}' with '{synonym}'")
+            # Final validation before replacement
+            if synonym.strip():
+                result_words[idx] = synonym
+                replacements_made += 1
+                logger.debug(f"Replaced '{words[idx]}' with '{synonym}'")
+            else:
+                logger.debug(f"Skipping invalid synonym '{synonym}' for '{words[idx]}'")
     
     return ' '.join(result_words)
 
@@ -338,13 +366,23 @@ def _add_modifiers(prompt: str, max_modifiers: int) -> str:
 def _remove_modifiers(prompt: str, max_removals: int) -> str:
     """Remove modifiers from the prompt"""
     words = prompt.split()
-    if len(words) <= 2:
+    if len(words) <= 3:  # Increased minimum to preserve sentence structure
         return prompt
     
-    # Identify potential modifiers (adjectives)
+    # Identify potential modifiers (adjectives) - only safe ones
     all_modifiers = set()
     for category_modifiers in MODIFIERS.values():
         all_modifiers.update(category_modifiers)
+    
+    # Add common adjectives that are safe to remove
+    safe_to_remove = {'good', 'great', 'nice', 'fine', 'decent', 'solid', 'reliable', 
+                      'excellent', 'outstanding', 'quality', 'premium', 'professional'}
+    all_modifiers.update(safe_to_remove)
+    
+    # Core nouns that should NEVER be removed
+    core_nouns = {'laptop', 'computer', 'device', 'machine', 'notebook', 'system',
+                  'phone', 'smartphone', 'tablet', 'programming', 'coding', 'development',
+                  'work', 'software', 'app', 'application', 'service', 'product'}
     
     result_words = words.copy()
     removals_made = 0
@@ -353,7 +391,8 @@ def _remove_modifiers(prompt: str, max_removals: int) -> str:
     while i < len(result_words) and removals_made < max_removals:
         word_clean = result_words[i].lower().strip('.,!?;:"\'')
         
-        if word_clean in all_modifiers:
+        # Only remove if it's a known modifier AND not a core noun
+        if word_clean in all_modifiers and word_clean not in core_nouns:
             removed_word = result_words.pop(i)
             removals_made += 1
             logger.debug(f"Removed modifier '{removed_word}'")
@@ -361,7 +400,11 @@ def _remove_modifiers(prompt: str, max_removals: int) -> str:
         else:
             i += 1
     
-    return ' '.join(result_words) if result_words else prompt
+    # Ensure we still have a reasonable sentence
+    if len(result_words) < 3:
+        return prompt  # Return original if too short
+    
+    return ' '.join(result_words)
 
 
 def prompt_reorder(prompt: str) -> str:
@@ -470,7 +513,7 @@ def intensity_modifier(prompt: str) -> str:
 def register_default_operators():
     """Register all default mutation operators"""
     operator_registry.register("synonym_replace", synonym_replace, weight=2.0)
-    operator_registry.register("chunk_shuffle", chunk_shuffle, weight=1.5)
+    # operator_registry.register("chunk_shuffle", chunk_shuffle, weight=1.5)  # Disabled - causes grammar issues
     operator_registry.register("modifier_toggle", modifier_toggle, weight=2.0)
     operator_registry.register("prompt_reorder", prompt_reorder, weight=1.8)
     operator_registry.register("intensity_modifier", intensity_modifier, weight=1.0)

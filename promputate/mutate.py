@@ -157,12 +157,16 @@ class PromptGA:
     
     def _crossover(self, ind1: List[str], ind2: List[str]) -> Tuple[List[str], List[str]]:
         """
-        Crossover operator for prompts
+        Crossover operator for prompts with validation
         
         Combines two prompts by mixing their components
         """
         if len(ind1) == 0 or len(ind2) == 0:
             return ind1, ind2
+        
+        # Store originals for fallback
+        original1 = ind1[0]
+        original2 = ind2[0]
         
         # Simple single-point crossover on prompt text
         prompt1, prompt2 = ind1[0], ind2[0]
@@ -180,8 +184,18 @@ class PromptGA:
             offspring1 = words1[:cp1] + words2[cp2:]
             offspring2 = words2[:cp2] + words1[cp1:]
             
-            ind1[0] = " ".join(offspring1)
-            ind2[0] = " ".join(offspring2)
+            # Validate offspring
+            candidate1 = " ".join(offspring1)
+            candidate2 = " ".join(offspring2)
+            
+            # Only apply if both offspring are valid
+            if (self._is_valid_mutation(original1, candidate1) and 
+                self._is_valid_mutation(original2, candidate2)):
+                ind1[0] = candidate1
+                ind2[0] = candidate2
+                logger.debug(f"Applied crossover: '{original1}' + '{original2}' -> '{candidate1}' + '{candidate2}'")
+            else:
+                logger.debug("Crossover failed validation, keeping originals")
         
         return ind1, ind2
     
@@ -208,10 +222,10 @@ class PromptGA:
                 # Validate the result
                 if self._is_valid_mutation(original_text, mutated_prompt):
                     individual[0] = mutated_prompt
-                    logger.debug(f"Applied mutation: {operator.__name__}")
+                    logger.debug(f"Applied mutation: {operator.__name__}: '{original_text}' -> '{mutated_prompt}'")
                     return individual,
                 else:
-                    logger.debug(f"Mutation {operator.__name__} failed validation")
+                    logger.warning(f"Mutation {operator.__name__} failed validation: '{original_text}' -> '{mutated_prompt}'")
                     
             except Exception as e:
                 logger.warning(f"Mutation {operator.__name__} failed: {e}")
@@ -254,6 +268,19 @@ class PromptGA:
         if mutated.lower().endswith((' a ', ' an ', ' the ', ' and ', ' or ', ' but ')):
             return False
         
+        # Check for inappropriate technical/medical terms
+        technical_terms = ['antiophthalmic', 'factor', 'syndrome', 'pathology', 'diagnosis', 
+                          'therapeutic', 'pharmaceutical', 'clinical', 'medical', 'anatomical']
+        mutated_lower = mutated.lower()
+        if any(term in mutated_lower for term in technical_terms):
+            return False
+        
+        # Check for overly long or complex words (likely technical jargon)
+        for word in words:
+            clean_word = word.strip('.,!?;:"\'').lower()
+            if len(clean_word) > 15 or clean_word.endswith(('ology', 'osis', 'itis', 'emia', 'ism', 'otic')):
+                return False
+        
         # Check for reasonable similarity to original (not completely different)
         original_words = set(original.lower().split())
         mutated_words = set(mutated.lower().split())
@@ -261,6 +288,88 @@ class PromptGA:
         
         # At least 25% word overlap to maintain meaning
         if overlap < min(3, len(original_words) * 0.25):
+            return False
+        
+        # Check that core nouns are preserved (especially for tech prompts)
+        core_nouns = {'laptop', 'computer', 'device', 'machine', 'notebook', 'system',
+                      'phone', 'smartphone', 'tablet', 'programming', 'coding', 'development',
+                      'underwear', 'clothing', 'garment', 'apparel', 'wear', 'attire', 'gear',
+                      'socks', 'shoes', 'shirt', 'pants', 'jacket', 'coat'}
+        original_core_nouns = original_words & core_nouns
+        mutated_core_nouns = mutated_words & core_nouns
+        
+        # If original had core nouns, mutated should have at least one
+        if original_core_nouns and not mutated_core_nouns:
+            return False
+        
+        # Special check for critical words being completely removed
+        critical_words = {'laptop', 'computer', 'programming', 'coding', 'development', 'underwear', 
+                         'clothing', 'socks', 'shoes', 'shirt', 'pants', 'jacket'}
+        for word in critical_words:
+            if word in original_words and word not in mutated_words:
+                # Allow if replaced by a synonym
+                synonyms = {
+                    'laptop': ['computer', 'notebook', 'machine', 'device', 'system'],
+                    'computer': ['laptop', 'notebook', 'machine', 'device', 'system'],
+                    'programming': ['coding', 'development', 'software'],
+                    'coding': ['programming', 'development', 'software'],
+                    'development': ['programming', 'coding', 'software'],
+                    'underwear': ['underclothing', 'underclothes', 'undergarment', 'clothing', 'garment', 'apparel'],
+                    'clothing': ['garment', 'apparel', 'wear', 'attire', 'gear'],
+                    'socks': ['hosiery', 'footwear', 'clothing'],
+                    'shoes': ['footwear', 'sneakers', 'boots'],
+                    'shirt': ['top', 'blouse', 'clothing'],
+                    'pants': ['trousers', 'bottoms', 'clothing'],
+                    'jacket': ['coat', 'outerwear', 'clothing']
+                }
+                
+                if word in synonyms:
+                    has_synonym = any(syn in mutated_words for syn in synonyms[word])
+                    if not has_synonym:
+                        return False
+        
+        # Check for basic grammar coherence (no repeated question words, etc.)
+        question_words = ['what', 'which', 'how', 'why', 'when', 'where', 'who']
+        question_count = sum(1 for word in words if word.lower() in question_words)
+        if question_count > 2:
+            return False
+        
+        # Check for proper article placement (grammar check)
+        for i, word in enumerate(words):
+            word_lower = word.lower()
+            
+            # Articles should not appear at the end
+            if word_lower in ['a', 'an', 'the'] and i == len(words) - 1:
+                return False
+            
+            # Articles should not appear right before prepositions
+            if (word_lower in ['a', 'an', 'the'] and i < len(words) - 1 and 
+                words[i + 1].lower() in ['for', 'of', 'in', 'on', 'at', 'by', 'with']):
+                return False
+            
+            # Check for nonsensical patterns like "laptop a for"
+            if (i < len(words) - 2 and 
+                words[i + 1].lower() in ['a', 'an'] and 
+                words[i + 2].lower() in ['for', 'of', 'in', 'on', 'at', 'by', 'with']):
+                return False
+            
+            # Check for broken patterns like "programming for a good laptop"
+            if (word_lower == 'programming' and i < len(words) - 1 and 
+                words[i + 1].lower() == 'for'):
+                return False
+            
+            # Check for patterns like "laptop good for" (adjective without article)
+            if (i < len(words) - 2 and 
+                words[i].lower() in ['laptop', 'computer', 'device', 'machine'] and
+                words[i + 1].lower() in ['good', 'great', 'excellent', 'quality'] and
+                words[i + 2].lower() == 'for'):
+                return False
+        
+        # Check for basic sentence structure (should start with verb/question word/pronoun)
+        first_word = words[0].lower()
+        valid_starters = ['recommend', 'suggest', 'advise', 'what', 'which', 'how', 'can', 'could', 
+                         'would', 'should', 'i', 'help', 'find', 'looking', 'need', 'want', 'please']
+        if first_word not in valid_starters:
             return False
         
         return True
@@ -293,16 +402,39 @@ class PromptGA:
         population.append(original)
         
         # Create variations using mutation operators
-        for _ in range(self.population_size - 1):
+        valid_variants = 0
+        max_attempts = (self.population_size - 1) * 5  # 5 attempts per needed variant
+        
+        for attempt in range(max_attempts):
+            if valid_variants >= self.population_size - 1:
+                break
+                
             # Start with base prompt
             variant = creator.Individual([base_prompt])  # type: ignore
             
             # Apply only 1 mutation to prevent cascading failures
+            original_text = variant[0]
             self._mutate(variant)
             
-            population.append(variant)
+            # Verify the mutation was valid
+            if variant[0] != original_text:  # Something was changed
+                logger.debug(f"Created variant {valid_variants + 1}: '{variant[0]}'")
+                # Double-check it's valid
+                if self._is_valid_mutation(base_prompt, variant[0]):
+                    population.append(variant)
+                    valid_variants += 1
+                else:
+                    logger.warning(f"Initial population variant failed validation: '{variant[0]}'")
+            else:
+                # Mutation was rejected, add original
+                population.append(variant)
+                valid_variants += 1
         
-        logger.info(f"Created initial population of {len(population)} individuals")
+        # If we didn't get enough valid variants, fill with originals
+        while len(population) < self.population_size:
+            population.append(creator.Individual([base_prompt]))  # type: ignore
+        
+        logger.info(f"Created initial population of {len(population)} individuals ({valid_variants} variants)")
         return population
     
     def calculate_population_diversity(self, population: List) -> float:
@@ -389,12 +521,12 @@ class PromptGA:
             offspring = self.toolbox.select(population, self.population_size - self.elite_size)  # type: ignore
             offspring = [self.toolbox.clone(ind) for ind in offspring]  # type: ignore
             
-            # Crossover
-            for i in range(0, len(offspring) - 1, 2):
-                if random.random() < self.crossover_rate:
-                    self.toolbox.mate(offspring[i], offspring[i + 1])  # type: ignore
-                    del offspring[i].fitness.values
-                    del offspring[i + 1].fitness.values
+            # Crossover - DISABLED due to grammar issues
+            # for i in range(0, len(offspring) - 1, 2):
+            #     if random.random() < self.crossover_rate:
+            #         self.toolbox.mate(offspring[i], offspring[i + 1])  # type: ignore
+            #         del offspring[i].fitness.values
+            #         del offspring[i + 1].fitness.values
             
             # Mutation
             for mutant in offspring:
